@@ -4,34 +4,54 @@ import type React from "react"
 
 import { useState } from "react"
 import Link from "next/link"
-import { Store, ArrowLeft } from "lucide-react"
+import { Store } from "lucide-react"
+import { signupBusiness, type SignupFormData } from "@/app/actions/auth"
 
-export default function SignUp() {
-  const [formData, setFormData] = useState({
+export default function RegisterNewBusiness() {
+  const [formData, setFormData] = useState<SignupFormData>({
     businessName: "",
     ownerName: "",
+    phoneNumber: "",
     email: "",
     password: "",
     confirmPassword: "",
   })
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [success, setSuccess] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
-
-    if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match")
-      return
-    }
-
+    setSuccess(false)
     setIsLoading(true)
-    // Mock signup process
-    setTimeout(() => {
+
+    try {
+      const response = await signupBusiness(formData)
+
+      if (response.success) {
+        setSuccess(true)
+        // Reset form
+        setFormData({
+          businessName: "",
+          ownerName: "",
+          phoneNumber: "",
+          email: "",
+          password: "",
+          confirmPassword: "",
+        })
+        // Show success message briefly, then redirect
+        setTimeout(() => {
+          window.location.href = "/auth/signin?registered=true"
+        }, 2000)
+      } else {
+        setError(response.error || "Registration failed")
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred")
+    } finally {
       setIsLoading(false)
-      alert("Account created successfully! Please sign in.")
-    }, 1000)
+    }
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -48,9 +68,15 @@ export default function SignUp() {
           <div className="mx-auto w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mb-4">
             <Store className="h-8 w-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Create Business Account</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Register New Business</h1>
           <p className="text-gray-600 mt-2">Start managing your inventory today</p>
         </div>
+
+        {success && (
+          <div className="mb-4 p-3 bg-green-50 text-green-700 rounded-md text-sm">
+            Business account created successfully! Redirecting to sign in...
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -64,14 +90,14 @@ export default function SignUp() {
               value={formData.businessName}
               onChange={handleChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Your business name"
+              placeholder="e.g., John's General Store"
               required
             />
           </div>
 
           <div>
             <label htmlFor="ownerName" className="block text-sm font-medium text-gray-700 mb-1">
-              Owner Name
+              Your Full Name
             </label>
             <input
               id="ownerName"
@@ -82,6 +108,21 @@ export default function SignUp() {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Your full name"
               required
+            />
+          </div>
+
+          <div>
+            <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700 mb-1">
+              Phone Number <span className="text-gray-500 text-xs">(optional)</span>
+            </label>
+            <input
+              id="phoneNumber"
+              name="phoneNumber"
+              type="tel"
+              value={formData.phoneNumber}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="e.g., 08012345678"
             />
           </div>
 
@@ -112,7 +153,7 @@ export default function SignUp() {
               value={formData.password}
               onChange={handleChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Create a password"
+              placeholder="Create a password (min 6 characters)"
               required
             />
           </div>
@@ -140,18 +181,17 @@ export default function SignUp() {
             disabled={isLoading}
             className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
           >
-            {isLoading ? "Creating Account..." : "Create Account"}
+            {isLoading ? "Creating Account..." : "Register Business"}
           </button>
         </form>
 
         <div className="mt-6 text-center">
-          <Link
-            href="/auth/signin"
-            className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-500"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Sign In
-          </Link>
+          <p className="text-sm text-gray-600">
+            Already have an account?{" "}
+            <Link href="/auth/signin" className="text-blue-600 hover:text-blue-500 font-medium">
+              Sign in
+            </Link>
+          </p>
         </div>
       </div>
     </div>

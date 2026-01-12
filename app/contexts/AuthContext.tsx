@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import { useRouter, usePathname } from "next/navigation"
+import { signinBusiness } from "@/app/actions/auth"
 
 type UserRole = "owner" | "staff"
 
@@ -11,6 +12,7 @@ interface User {
   email: string
   role: UserRole
   businessName: string
+  phoneNumber?: string
 }
 
 interface AuthContextType {
@@ -21,24 +23,6 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
-
-// Mock users for demonstration
-const mockUsers: User[] = [
-  {
-    id: "1",
-    name: "Adebayo Okafor",
-    email: "owner@business.com",
-    role: "owner",
-    businessName: "Okafor General Store",
-  },
-  {
-    id: "2",
-    name: "Fatima Hassan",
-    email: "staff@business.com",
-    role: "staff",
-    businessName: "Okafor General Store",
-  },
-]
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -69,14 +53,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user, pathname, router, isLoading])
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    // Mock authentication
-    const foundUser = mockUsers.find((u) => u.email === email)
-    if (foundUser && password === "password") {
-      setUser(foundUser)
-      localStorage.setItem("user", JSON.stringify(foundUser))
-      return true
+    try {
+      const response = await signinBusiness(email, password)
+
+      if (response.success && response.user) {
+        const userData: User = {
+          id: response.user.id,
+          name: response.user.name,
+          email: response.user.email,
+          businessName: response.user.businessName,
+          role: response.user.role,
+          phoneNumber: response.user.phoneNumber,
+        }
+        setUser(userData)
+        localStorage.setItem("user", JSON.stringify(userData))
+        return true
+      }
+      return false
+    } catch (error) {
+      console.error("[v0] Login error:", error)
+      return false
     }
-    return false
   }
 
   const logout = () => {
