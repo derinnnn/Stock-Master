@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import AppLayout from "../components/AppLayout"
+import TaxSummaryCard from "../components/TaxSummaryCard"
 import { Calendar, TrendingUp, Download } from "lucide-react"
 
 // Mock data for charts
@@ -140,6 +141,8 @@ export default function Reports() {
             </div>
           </div>
         </div>
+
+        <TaxSummaryCard totalRevenue={avgSales} />
 
         {/* Additional Insights */}
         <div className="bg-white rounded-lg shadow-sm border p-6">
