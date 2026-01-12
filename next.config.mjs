@@ -1,14 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  eslint: {
-    ignoreDuringBuilds: true,
+  experimental: {
+    serverActions: {
+      allowedOrigins: [
+        'localhost:3000',
+        // This allows your specific Codespace to run Server Actions
+        'musical-train-5jq6rgrq5grfvrj9-3000.app.github.dev', 
+      ],
+    },
   },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  images: {
-    unoptimized: true,
-  },
-}
+};
 
-export default nextConfig
+export default nextConfig;

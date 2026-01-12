@@ -1,116 +1,94 @@
-"use server"
+'use server'
 
-export interface SignupFormData {
+import { createClient } from '../utils/supabase/server'
+
+// --- TYPES ---
+
+export type SignupFormData = {
   businessName: string
   ownerName: string
   phoneNumber: string
   email: string
   password: string
-  confirmPassword: string
+  confirmPassword?: string
 }
 
-export interface AuthResponse {
-  success: boolean
-  message?: string
-  error?: string
-  user?: {
-    id: string
-    name: string
-    email: string
-    businessName: string
-    phoneNumber: string
-    role: "owner"
-  }
+export type SigninFormData = {
+  email: string
+  password: string
 }
 
-export async function signupBusiness(formData: SignupFormData): Promise<AuthResponse> {
-  if (!formData.businessName || !formData.ownerName || !formData.email || !formData.password) {
-    return {
-      success: false,
-      error: "All required fields must be filled",
-    }
+// --- ACTIONS ---
+
+export async function signupBusiness(data: SignupFormData) {
+  const supabase = await createClient()
+
+  // 1. Basic Password Validation
+  if (data.password !== data.confirmPassword) {
+    return { success: false, error: "Passwords do not match" }
   }
 
-  if (formData.password !== formData.confirmPassword) {
-    return {
-      success: false,
-      error: "Passwords do not match",
-    }
-  }
-
-  if (formData.password.length < 6) {
-    return {
-      success: false,
-      error: "Password must be at least 6 characters",
-    }
-  }
-
-  if (!formData.email.includes("@")) {
-    return {
-      success: false,
-      error: "Please enter a valid email address",
-    }
-  }
-
-  await new Promise((resolve) => setTimeout(resolve, 1000))
-
-  const mockUser = {
-    id: `user_${Date.now()}`,
-    name: formData.ownerName,
-    email: formData.email,
-    businessName: formData.businessName,
-    phoneNumber: formData.phoneNumber || "",
-    role: "owner" as const,
-  }
-
-  return {
-    success: true,
-    message: "Business account created successfully",
-    user: mockUser,
-  }
-}
-
-export async function signinBusiness(email: string, password: string): Promise<AuthResponse> {
-  if (!email || !password) {
-    return {
-      success: false,
-      error: "Email and password are required",
-    }
-  }
-
-  await new Promise((resolve) => setTimeout(resolve, 800))
-
-  const mockUsers = [
-    {
-      id: "1",
-      name: "Adebayo Okafor",
-      email: "owner@business.com",
-      businessName: "Okafor General Store",
-      phoneNumber: "08012345678",
-      role: "owner" as const,
+  // 2. Create the User in Supabase Auth
+  const { data: authData, error: authError } = await supabase.auth.signUp({
+    email: data.email,
+    password: data.password,
+    options: {
+      data: {
+        full_name: data.ownerName, // We save the Owner Name in the user metadata
+      },
     },
-    {
-      id: "2",
-      name: "Fatima Hassan",
-      email: "staff@business.com",
-      businessName: "Okafor General Store",
-      phoneNumber: "08087654321",
-      role: "staff" as const,
-    },
-  ]
+  })
 
-  const foundUser = mockUsers.find((u) => u.email === email)
+  if (authError) {
+    console.error('Auth Error:', authError.message)
+    return { success: false, error: authError.message }
+  }
 
-  if (foundUser && password === "password") {
-    return {
-      success: true,
-      message: "Signed in successfully",
-      user: foundUser,
+  // 3. Create the Business Profile in your Database Table
+  if (authData.user) {
+    const { error: dbError } = await supabase
+      .from('businesses')
+      .insert({
+        id: authData.user.id, // Links this business to the login user
+        business_name: data.businessName,
+        phone_number: data.phoneNumber
+      })
+
+    if (dbError) {
+      console.error('DB Error:', dbError.message)
+      return { success: false, error: 'Account created, but business profile failed.' }
     }
   }
 
-  return {
-    success: false,
-    error: "Invalid email or password",
+  // 4. Return success so the frontend can redirect
+  return { success: true }
+}
+
+export async function signinBusiness(data: SigninFormData) {
+  const supabase = await createClient()
+
+  // 1. Attempt to sign in with email and password
+  const { error } = await supabase.auth.signInWithPassword({
+    email: data.email,
+    password: data.password,
+  })
+
+  // 2. Handle errors
+  if (error) {
+    console.error('Login Error:', error.message)
+    return { success: false, error: error.message }
   }
+
+  // 3. Success (Next.js handles the session cookies automatically)
+  return { success: true }
+}
+
+// app/actions/auth.ts
+
+import { redirect } from 'next/navigation'
+
+export async function signout() {
+  const supabase = await createClient()
+  await supabase.auth.signOut()
+  redirect('/auth/signin')
 }

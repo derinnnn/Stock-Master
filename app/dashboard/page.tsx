@@ -1,136 +1,116 @@
+import { createClient } from "./../utils/supabase/server"
 import AppLayout from "../components/AppLayout"
-import { Package, TrendingUp, AlertTriangle, ShoppingCart } from "lucide-react"
+import { Package, AlertTriangle, ShoppingCart, TrendingUp } from "lucide-react"
 
-// Mock data
-const stats = [
-  {
-    title: "Total Items",
-    value: "1,234",
-    change: "+12%",
-    changeType: "positive" as const,
-    icon: Package,
-  },
-  {
-    title: "Low Stock Items",
-    value: "23",
-    change: "+5",
-    changeType: "negative" as const,
-    icon: AlertTriangle,
-  },
-  {
-    title: "Today's Sales",
-    value: "₦45,600",
-    change: "+8%",
-    changeType: "positive" as const,
-    icon: ShoppingCart,
-  },
-  {
-    title: "This Month",
-    value: "₦1,234,500",
-    change: "+15%",
-    changeType: "positive" as const,
-    icon: TrendingUp,
-  },
-]
+export default async function Dashboard() {
+  const supabase = await createClient()
 
-const recentSales = [
-  { id: 1, item: "Rice (50kg)", quantity: 2, amount: "₦45,000", time: "2 hours ago" },
-  { id: 2, item: "Cooking Oil (5L)", quantity: 5, amount: "₦12,500", time: "3 hours ago" },
-  { id: 3, item: "Sugar (1kg)", quantity: 10, amount: "₦8,000", time: "5 hours ago" },
-]
+  // 1. Get the current user
+  const { data: { user } } = await supabase.auth.getUser()
 
-const lowStockItems = [
-  { id: 1, name: "Tomato Paste", current: 5, minimum: 20, unit: "pieces" },
-  { id: 2, name: "Bread", current: 8, minimum: 30, unit: "loaves" },
-  { id: 3, name: "Milk (1L)", current: 12, minimum: 25, unit: "pieces" },
-]
+  // 2. Get Real Inventory Counts
+  const { count: totalItems } = await supabase
+    .from('inventory')
+    .select('*', { count: 'exact', head: true })
+    .eq('business_id', user?.id)
 
-export default function Dashboard() {
+  const { count: lowStockCount } = await supabase
+    .from('inventory')
+    .select('*', { count: 'exact', head: true })
+    .eq('business_id', user?.id)
+    .lt('stock', 10) // Assuming low stock is < 10 for now (or use min_stock column if you added it)
+
+  // 3. Get Recent Items (Real Data)
+  const { data: recentItems } = await supabase
+    .from('inventory')
+    .select('*')
+    .eq('business_id', user?.id)
+    .order('created_at', { ascending: false })
+    .limit(3)
+
   return (
     <AppLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-600">Overview of your business performance</p>
+           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+           <p className="text-gray-600">Overview of your business performance</p>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {stats.map((stat) => {
-            const Icon = stat.icon
-            return (
-              <div key={stat.title} className="bg-white p-6 rounded-lg shadow-sm border">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">{stat.title}</p>
-                    <p className="text-2xl font-bold text-gray-900 mt-1">{stat.value}</p>
-                  </div>
-                  <div className={`p-3 rounded-full ${stat.changeType === "positive" ? "bg-green-100" : "bg-red-100"}`}>
-                    <Icon className={`h-6 w-6 ${stat.changeType === "positive" ? "text-green-600" : "text-red-600"}`} />
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <span
-                    className={`text-sm font-medium ${
-                      stat.changeType === "positive" ? "text-green-600" : "text-red-600"
-                    }`}
-                  >
-                    {stat.change}
-                  </span>
-                  <span className="text-sm text-gray-500 ml-1">from last month</span>
-                </div>
+        {/* STATS CARDS */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          
+          {/* Total Items */}
+          <div className="bg-white p-6 rounded-lg shadow-sm border">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Items</p>
+                <h3 className="text-2xl font-bold text-gray-900 mt-2">{totalItems || 0}</h3>
               </div>
-            )
-          })}
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Recent Sales */}
-          <div className="bg-white rounded-lg shadow-sm border">
-            <div className="p-6 border-b">
-              <h2 className="text-lg font-semibold text-gray-900">Recent Sales</h2>
-            </div>
-            <div className="p-6">
-              <div className="space-y-4">
-                {recentSales.map((sale) => (
-                  <div key={sale.id} className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-gray-900">{sale.item}</p>
-                      <p className="text-sm text-gray-500">
-                        Qty: {sale.quantity} • {sale.time}
-                      </p>
-                    </div>
-                    <p className="font-semibold text-green-600">{sale.amount}</p>
-                  </div>
-                ))}
+              <div className="p-2 bg-green-50 rounded-lg">
+                <Package className="h-6 w-6 text-green-600" />
               </div>
             </div>
           </div>
 
-          {/* Low Stock Alert */}
-          <div className="bg-white rounded-lg shadow-sm border">
-            <div className="p-6 border-b">
-              <h2 className="text-lg font-semibold text-gray-900">Low Stock Alert</h2>
+          {/* Low Stock */}
+          <div className="bg-white p-6 rounded-lg shadow-sm border">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Low Stock Items</p>
+                <h3 className="text-2xl font-bold text-gray-900 mt-2">{lowStockCount || 0}</h3>
+              </div>
+              <div className="p-2 bg-red-50 rounded-lg">
+                <AlertTriangle className="h-6 w-6 text-red-600" />
+              </div>
             </div>
-            <div className="p-6">
-              <div className="space-y-4">
-                {lowStockItems.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between">
+          </div>
+
+          {/* Placeholders for Sales (Since we don't have sales table yet) */}
+          <div className="bg-white p-6 rounded-lg shadow-sm border opacity-60">
+             <div className="flex justify-between items-start">
+               <div>
+                 <p className="text-sm font-medium text-gray-600">Today's Sales</p>
+                 <h3 className="text-2xl font-bold text-gray-900 mt-2">₦0</h3>
+               </div>
+               <div className="p-2 bg-blue-50 rounded-lg">
+                 <ShoppingCart className="h-6 w-6 text-blue-600" />
+               </div>
+             </div>
+             <p className="text-xs text-gray-500 mt-2">Sales tracking coming soon</p>
+          </div>
+          
+           <div className="bg-white p-6 rounded-lg shadow-sm border opacity-60">
+             <div className="flex justify-between items-start">
+               <div>
+                 <p className="text-sm font-medium text-gray-600">This Month</p>
+                 <h3 className="text-2xl font-bold text-gray-900 mt-2">₦0</h3>
+               </div>
+               <div className="p-2 bg-purple-50 rounded-lg">
+                 <TrendingUp className="h-6 w-6 text-purple-600" />
+               </div>
+             </div>
+             <p className="text-xs text-gray-500 mt-2">Reports coming soon</p>
+          </div>
+        </div>
+
+        {/* Recent Activity Section */}
+        <div className="bg-white rounded-lg shadow-sm border p-6">
+           <h3 className="font-semibold text-gray-800 mb-4">Recently Added Inventory</h3>
+           <div className="space-y-4">
+             {recentItems && recentItems.length > 0 ? (
+               recentItems.map((item) => (
+                 <div key={item.id} className="flex justify-between items-center py-2 border-b last:border-0">
                     <div>
                       <p className="font-medium text-gray-900">{item.name}</p>
-                      <p className="text-sm text-gray-500">
-                        {item.current} {item.unit} remaining
-                      </p>
+                      <p className="text-sm text-gray-500">{item.stock} in stock</p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm text-red-600 font-medium">Low Stock</p>
-                      <p className="text-xs text-gray-500">Min: {item.minimum}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+                    <span className="text-green-600 font-medium">₦{item.price}</span>
+                 </div>
+               ))
+             ) : (
+               <p className="text-gray-500 text-sm">No items added yet. Go to Inventory to start!</p>
+             )}
+           </div>
         </div>
       </div>
     </AppLayout>

@@ -1,22 +1,21 @@
 import { createClient } from "./../utils/supabase/server"
 import AppLayout from "../components/AppLayout"
-import StaffClient from "./staff-client"
+import SalesHistoryClient from "./history-client"
 
-export default async function StaffPage() {
+export default async function SalesHistoryPage() {
   const supabase = await createClient()
-
-  // 1. Fetch Real Staff List
   const { data: { user } } = await supabase.auth.getUser()
-  
-  const { data: staffList, error } = await supabase
-    .from('staff')
+
+  // Fetch all sales, newest first
+  const { data: sales, error } = await supabase
+    .from('sales')
     .select('*')
     .eq('business_id', user?.id)
-    .order('joined_at', { ascending: false })
+    .order('sold_at', { ascending: false })
 
   return (
     <AppLayout>
-      <StaffClient initialStaff={staffList || []} />
+      <SalesHistoryClient initialSales={sales || []} />
     </AppLayout>
   )
 }

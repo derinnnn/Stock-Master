@@ -7,9 +7,9 @@ import { AuthProvider } from "./contexts/AuthContext"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "StockKeeper - Inventory Management",
-  description: "Simple inventory management for Nigerian SMEs",
-    generator: 'v0.dev'
+  title: "StockKeeper - Business Manager",
+  description: "Inventory, Sales, and Profit tracking for Nigerian businesses",
+    generator: 'Aderinola'
 }
 
 export default function RootLayout({
