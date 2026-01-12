@@ -4,11 +4,9 @@ import { Package, AlertTriangle, ShoppingCart, TrendingUp } from "lucide-react"
 
 export default async function Dashboard() {
   const supabase = await createClient()
-
-  // 1. Get the current user
   const { data: { user } } = await supabase.auth.getUser()
 
-  // 2. Get Real Inventory Counts
+  // 1. Get Inventory Counts
   const { count: totalItems } = await supabase
     .from('inventory')
     .select('*', { count: 'exact', head: true })
@@ -18,9 +16,39 @@ export default async function Dashboard() {
     .from('inventory')
     .select('*', { count: 'exact', head: true })
     .eq('business_id', user?.id)
-    .lt('stock', 10) // Assuming low stock is < 10 for now (or use min_stock column if you added it)
+    .lt('stock', 10) 
 
-  // 3. Get Recent Items (Real Data)
+  // 2. Get Sales Data (For Today & This Month)
+  const now = new Date()
+  
+  // Calculate Start of Month (YYYY-MM-01)
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+  
+  // Calculate Start of Today (YYYY-MM-DD 00:00:00)
+  // Note: This uses UTC. For strict Nigerian time, we'd adjust, but this is fine for MVP.
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+
+  // Fetch sales from the start of the month until now
+  const { data: recentSales } = await supabase
+    .from('sales')
+    .select('total_amount, sold_at')
+    .eq('business_id', user?.id)
+    .gte('sold_at', startOfMonth)
+
+  // Calculate Totals in Javascript
+  let monthSales = 0
+  let todaySales = 0
+
+  if (recentSales) {
+    recentSales.forEach(sale => {
+        monthSales += Number(sale.total_amount)
+        if (sale.sold_at >= startOfDay) {
+            todaySales += Number(sale.total_amount)
+        }
+    })
+  }
+
+  // 3. Get Recent Items for List
   const { data: recentItems } = await supabase
     .from('inventory')
     .select('*')
@@ -65,31 +93,32 @@ export default async function Dashboard() {
             </div>
           </div>
 
-          {/* Placeholders for Sales (Since we don't have sales table yet) */}
-          <div className="bg-white p-6 rounded-lg shadow-sm border opacity-60">
+          {/* Today's Sales (Active) */}
+          <div className="bg-white p-6 rounded-lg shadow-sm border">
              <div className="flex justify-between items-start">
                <div>
                  <p className="text-sm font-medium text-gray-600">Today's Sales</p>
-                 <h3 className="text-2xl font-bold text-gray-900 mt-2">₦0</h3>
+                 <h3 className="text-2xl font-bold text-gray-900 mt-2">₦{todaySales.toLocaleString()}</h3>
                </div>
                <div className="p-2 bg-blue-50 rounded-lg">
                  <ShoppingCart className="h-6 w-6 text-blue-600" />
                </div>
              </div>
-             <p className="text-xs text-gray-500 mt-2">Sales tracking coming soon</p>
+             <p className="text-xs text-green-600 mt-2 font-medium">Live Update</p>
           </div>
           
-           <div className="bg-white p-6 rounded-lg shadow-sm border opacity-60">
+          {/* Month Sales (Active) */}
+           <div className="bg-white p-6 rounded-lg shadow-sm border">
              <div className="flex justify-between items-start">
                <div>
                  <p className="text-sm font-medium text-gray-600">This Month</p>
-                 <h3 className="text-2xl font-bold text-gray-900 mt-2">₦0</h3>
+                 <h3 className="text-2xl font-bold text-gray-900 mt-2">₦{monthSales.toLocaleString()}</h3>
                </div>
                <div className="p-2 bg-purple-50 rounded-lg">
                  <TrendingUp className="h-6 w-6 text-purple-600" />
                </div>
              </div>
-             <p className="text-xs text-gray-500 mt-2">Reports coming soon</p>
+             <p className="text-xs text-gray-500 mt-2">Current billing cycle</p>
           </div>
         </div>
 
@@ -100,11 +129,11 @@ export default async function Dashboard() {
              {recentItems && recentItems.length > 0 ? (
                recentItems.map((item) => (
                  <div key={item.id} className="flex justify-between items-center py-2 border-b last:border-0">
-                    <div>
-                      <p className="font-medium text-gray-900">{item.name}</p>
-                      <p className="text-sm text-gray-500">{item.stock} in stock</p>
-                    </div>
-                    <span className="text-green-600 font-medium">₦{item.price}</span>
+                   <div>
+                     <p className="font-medium text-gray-900">{item.name}</p>
+                     <p className="text-sm text-gray-500">{item.stock} in stock</p>
+                   </div>
+                   <span className="text-green-600 font-medium">₦{item.price.toLocaleString()}</span>
                  </div>
                ))
              ) : (

@@ -1,58 +1,72 @@
 import { createClient } from "./../utils/supabase/server"
 import AppLayout from "../components/AppLayout"
 import ReportsClient from "./reports-client"
+import { format, subMonths, startOfMonth, parseISO } from "date-fns"
 
 export default async function ReportsPage() {
   const supabase = await createClient()
-
-  // 1. Fetch Sales Data with PROFIT
   const { data: { user } } = await supabase.auth.getUser()
   
-  const { data: sales, error } = await supabase
+  // 1. Calculate Date Range (Last 12 Months)
+  const today = new Date()
+  const twelveMonthsAgo = subMonths(startOfMonth(today), 11).toISOString() // Go back 11 months + current month
+
+  // 2. Fetch Data (Sales & Expenses from last 12 months only)
+  const { data: sales } = await supabase
     .from('sales')
     .select('*')
     .eq('business_id', user?.id)
+    .gte('sold_at', twelveMonthsAgo) // Filter by date
     .order('sold_at', { ascending: true })
 
-  if (error || !sales) {
-    return <AppLayout><div>Error loading reports</div></AppLayout>
-  }
+  const { data: expenses } = await supabase
+    .from('expenses')
+    .select('*')
+    .eq('business_id', user?.id)
+    .gte('date', twelveMonthsAgo)
+    .order('date', { ascending: false })
 
-  // 2. Perform Calculations
-  const totalRevenue = sales.reduce((sum, sale) => sum + Number(sale.total_amount), 0)
-  const totalItemsSold = sales.reduce((sum, sale) => sum + Number(sale.quantity), 0)
+  const safeSales = sales || []
+  const safeExpenses = expenses || []
+
+  // 3. Calculate Totals
+  const totalRevenue = safeSales.reduce((sum, sale) => sum + Number(sale.total_amount), 0)
+  const totalGrossProfit = safeSales.reduce((sum, sale) => sum + Number(sale.profit), 0)
+  const totalOperatingExpenses = safeExpenses.reduce((sum, exp) => sum + Number(exp.amount), 0)
+  const totalItemsSold = safeSales.reduce((sum, sale) => sum + Number(sale.quantity), 0)
   
-  // NEW: Sum up the actual profit from every transaction
-  const totalGrossProfit = sales.reduce((sum, sale) => sum + Number(sale.profit), 0)
-
-  // Calculate Average
-  const averageMonthlyRevenue = totalRevenue // (Simplify for now)
-
-  // Group by Month (for Chart)
+  // 4. Robust Graph Data (Last 12 Months)
   const monthMap = new Map<string, number>()
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-  
-  const currentMonthIndex = new Date().getMonth()
-  for (let i = 5; i >= 0; i--) {
-      const d = new Date()
-      d.setMonth(d.getMonth() - i)
-      monthMap.set(months[d.getMonth()], 0)
+  const labels: string[] = []
+
+  // Generate labels using date-fns (Deterministic)
+  for (let i = 11; i >= 0; i--) {
+      const d = subMonths(today, i)
+      const label = format(d, 'MMM yyyy') // e.g., "Jan 2026"
+      labels.push(label)
+      monthMap.set(label, 0)
   }
 
-  sales.forEach(sale => {
-      const date = new Date(sale.sold_at)
-      const monthName = months[date.getMonth()]
-      if (monthMap.has(monthName)) {
-          monthMap.set(monthName, (monthMap.get(monthName) || 0) + Number(sale.total_amount))
+  // Map Sales to these Labels
+  safeSales.forEach(sale => {
+      // Parse the DB timestamp safely
+      const saleDate = new Date(sale.sold_at)
+      const label = format(saleDate, 'MMM yyyy')
+      
+      if (monthMap.has(label)) {
+          monthMap.set(label, (monthMap.get(label) || 0) + Number(sale.total_amount))
       }
   })
 
-  const salesByMonth = Array.from(monthMap).map(([month, total]) => ({ month, total }))
+  // Convert to Array
+  const salesByMonth = labels.map(label => ({
+      month: label,
+      total: monthMap.get(label) || 0
+  }))
 
-  // Group by Product
+  // 5. Top Products Logic
   const productMap = new Map<string, { quantity: number; revenue: number }>()
-  
-  sales.forEach(sale => {
+  safeSales.forEach(sale => {
       const current = productMap.get(sale.product_name) || { quantity: 0, revenue: 0 }
       productMap.set(sale.product_name, {
           quantity: current.quantity + sale.quantity,
@@ -65,14 +79,16 @@ export default async function ReportsPage() {
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 5)
 
-  // 3. Package Data
+  // 6. Package Data
   const reportData = {
       totalRevenue,
-      totalGrossProfit, // Passing the real profit to the frontend
+      totalGrossProfit,
+      totalOperatingExpenses,
       totalItemsSold,
-      averageMonthlyRevenue,
       salesByMonth,
-      topProducts
+      topProducts,
+      expensesList: safeExpenses,
+      rawSales: safeSales // Passing raw sales for the Export CSV function
   }
 
   return (
