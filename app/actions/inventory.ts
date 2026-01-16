@@ -1,49 +1,36 @@
 'use server'
 
-import { createClient } from './../utils/supabase/server' // Ensure this path matches your structure
+import { createClient } from './../utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 
-// Define the shape of our Inventory Item
-export type InventoryItem = {
-  id: string
-  name: string
-  category: string
-  stock: number
-  price: number        // Selling Price
-  cost_price: number   // Cost Price (Hidden from customer)
-  minStock: number
-  unit: string
-}
-
-// 1. ADD NEW ITEM (Now with Profit Tracking)
-export async function addInventoryItem(formData: FormData) {
+// 1. ADD NEW ITEM
+// We renamed this to 'addProduct' to match your Inventory Client
+export async function addProduct(formData: FormData) {
   const supabase = await createClient()
 
-  // Get the current user so we know who owns this item
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'Not authorized' }
 
+  // 1. Capture data from the form (using the names from the new Modal)
   const name = formData.get('name') as string
   const category = formData.get('category') as string
   const stock = Number(formData.get('stock'))
   
-  // UPDATED: Capture both Cost and Selling Price
-  // Note: The form must send 'sellingPrice' and 'costPrice'
-  const sellingPrice = Number(formData.get('sellingPrice'))
-  const costPrice = Number(formData.get('costPrice'))
-  
-  const minStock = Number(formData.get('minStock'))
-  const unit = formData.get('unit') as string
+  // FIX: Match the input names from the client form ('price' and 'cost')
+  const price = Number(formData.get('price')) 
+  const cost = Number(formData.get('cost'))
 
+  // 2. Insert into Database
+  // Note: We map 'price' from form -> 'price' or 'selling_price' in DB.
+  // Based on your previous file, your DB column is likely named 'price'.
   const { error } = await supabase.from('inventory').insert({
-    business_id: user.id, // Link to the user
+    business_id: user.id,
     name,
     category,
     stock,
-    price: sellingPrice,      // Maps to 'price' column (Selling)
-    cost_price: costPrice,    // Maps to 'cost_price' column (Buying)
-    min_stock: minStock,
-    unit
+    price: price,          // Selling Price
+    cost_price: cost,      // Cost Price
+    min_stock: 5           // Default default alert level
   })
 
   if (error) {
@@ -51,18 +38,20 @@ export async function addInventoryItem(formData: FormData) {
     return { success: false, error: error.message }
   }
 
-  revalidatePath('/inventory') // Refresh the page to show new data
+  revalidatePath('/inventory')
+  revalidatePath('/sales-entry')
   return { success: true }
 }
 
-// 2. UPDATE STOCK LEVEL
-export async function updateStockLevel(itemId: string, newStock: number) {
+// 2. UPDATE PRICE (Used by the "Edit" pencil)
+export async function updateProductPrice(id: string, newPrice: number) {
   const supabase = await createClient()
   
+  // Update the 'price' column (or 'selling_price' if you renamed it)
   const { error } = await supabase
     .from('inventory')
-    .update({ stock: newStock })
-    .eq('id', itemId)
+    .update({ price: newPrice }) 
+    .eq('id', id)
 
   if (error) return { success: false, error: error.message }
   

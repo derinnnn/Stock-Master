@@ -10,4 +10,4 @@ export default async function LandingPage() {
   } else {
     redirect('/auth/signin')
   }
-}
+}//Allow me to see you baby. Which one be say you dey for Wuse-se (Kilo)

@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { TrendingUp, Download, DollarSign, PieChart, Plus, Trash2, CheckCircle, AlertCircle, ShoppingBag } from "lucide-react"
 import { addExpense, deleteExpense } from "@/app/actions/expenses"
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 // Types
 type Expense = {
@@ -48,12 +49,15 @@ export default function ReportsClient({ data }: { data: ReportData }) {
   const bestProduct = data.topProducts[0]?.name || "None"
   const busiestMonth = data.salesByMonth.reduce((prev, current) => (prev.total > current.total) ? prev : current, { month: '-', total: 0 })
 
+  // Transform Data for Recharts
+  const chartData = data.salesByMonth.map(d => ({
+    name: d.month,
+    revenue: d.total
+  }))
+
   // --- EXPORT FUNCTION ---
   const handleExport = () => {
-    // 1. Headers
     const headers = ["Date", "Time", "Product", "Quantity", "Total Amount (NGN)", "Profit (NGN)"]
-    
-    // 2. Rows
     const rows = data.rawSales.map(sale => {
         const d = new Date(sale.sold_at)
         return [
@@ -66,16 +70,14 @@ export default function ReportsClient({ data }: { data: ReportData }) {
         ]
     })
 
-    // 3. Combine
     const csvContent = "data:text/csv;charset=utf-8," 
         + headers.join(",") + "\n" 
         + rows.map(e => e.join(",")).join("\n")
 
-    // 4. Download
     const encodedUri = encodeURI(csvContent)
     const link = document.createElement("a")
     link.setAttribute("href", encodedUri)
-    link.setAttribute("download", `StockKeeper_Report_${new Date().toISOString().split('T')[0]}.csv`)
+    link.setAttribute("download", `Odin_Report_${new Date().toISOString().split('T')[0]}.csv`)
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -155,31 +157,30 @@ export default function ReportsClient({ data }: { data: ReportData }) {
 
       {/* 2. CHARTS & PRODUCTS */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Sales Trend Chart */}
+        {/* Sales Trend Chart (RECHARTS) */}
         <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <h3 className="font-semibold text-gray-800 mb-6 flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-gray-500" /> Revenue Trend
           </h3>
-          <div className="flex items-end justify-between h-64 gap-3 px-2 overflow-x-auto">
-            {data.salesByMonth.map((month, index) => {
-                const max = Math.max(...data.salesByMonth.map(m => m.total)) || 1
-                const height = (month.total / max) * 100
-                return (
-                    <div key={index} className="flex flex-col items-center gap-2 min-w-[30px] flex-1 group cursor-pointer">
-                            <div className="relative w-full bg-blue-50 rounded-t-sm h-full flex items-end overflow-hidden">
-                                <div 
-                                style={{ height: `${height}%` }} 
-                                className="w-full bg-blue-500 group-hover:bg-blue-600 transition-all duration-300 rounded-t-sm"
-                                />
-                                {/* Tooltip */}
-                                <div className="absolute bottom-0 w-full text-center text-[10px] text-white font-bold opacity-0 group-hover:opacity-100 pb-1 transition-opacity">
-                                    ₦{(month.total/1000).toFixed(0)}k
-                                </div>
-                            </div>
-                            <span className="text-[10px] text-gray-500 font-medium whitespace-nowrap">{month.month}</span>
-                    </div>
-                )
-            })}
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" tick={{fontSize: 12}} tickLine={false} axisLine={false} />
+                <YAxis tick={{fontSize: 12}} tickLine={false} axisLine={false} />
+                <Tooltip 
+                    contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                    formatter={(value: number) => [`₦${value.toLocaleString()}`, 'Revenue']}
+                />
+                <Area type="monotone" dataKey="revenue" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorRev)" />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
