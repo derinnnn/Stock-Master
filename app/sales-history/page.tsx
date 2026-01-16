@@ -6,16 +6,27 @@ export default async function SalesHistoryPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Fetch all sales, newest first
-  const { data: sales, error } = await supabase
+  if (!user) return <div>Please log in</div>
+
+  const { data: sales } = await supabase
     .from('sales')
     .select('*')
-    .eq('business_id', user?.id)
+    .eq('business_id', user.id)
     .order('sold_at', { ascending: false })
+
+  // FETCH BUSINESS DETAILS
+  const { data: business } = await supabase
+    .from('businesses')
+    .select('*')
+    .eq('id', user.id)
+    .single()
 
   return (
     <AppLayout>
-      <SalesHistoryClient initialSales={sales || []} />
+      <SalesHistoryClient 
+        initialSales={sales || []} 
+        business={business || {}} // Pass data
+      />
     </AppLayout>
   )
 }
