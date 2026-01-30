@@ -2,6 +2,7 @@ import { createClient } from "./../utils/supabase/server"
 import AppLayout from "../components/AppLayout"
 import { Package, AlertTriangle, ShoppingCart, TrendingUp, ArrowRight, DollarSign } from "lucide-react"
 import Link from "next/link"
+import ExpenseButton from "./expense-modal"
 
 export default async function Dashboard() {
   const supabase = await createClient()
@@ -58,11 +59,16 @@ export default async function Dashboard() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div>
-           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-           <p className="text-gray-600">Overview of your business performance</p>
+        {/* HEADER SECTION - NOW WITH EXPENSE BUTTON */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+               <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+               <p className="text-gray-600">Overview of your business performance</p>
+            </div>
+            
+            {/* The Button Component you imported */}
+            <ExpenseButton /> 
         </div>
-
         {/* --- STATS CARDS --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           

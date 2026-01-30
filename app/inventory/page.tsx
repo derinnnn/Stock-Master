@@ -1,26 +1,33 @@
 import { createClient } from "./../utils/supabase/server"
 import AppLayout from "../components/AppLayout"
-import InventoryClient from "./inventory-client" // We'll create this next
+import InventoryClient from "./inventory-client"
 
 export default async function InventoryPage() {
   const supabase = await createClient()
-  
-  // 1. Fetch Real Data from Supabase
-  const { data: inventory, error } = await supabase
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) return <div>Please log in</div>
+
+  // 1. Fetch Inventory Items
+  const { data: inventory } = await supabase
     .from('inventory')
     .select('*')
-    .order('created_at', { ascending: false })
+    .eq('business_id', user.id)
+    .order('name', { ascending: true })
 
-  if (error) {
-    console.error("Error fetching inventory:", error)
-  }
+  // 2. Fetch Business Tags (NEW)
+  const { data: business } = await supabase
+    .from('businesses')
+    .select('inventory_tags')
+    .eq('id', user.id)
+    .single()
 
-  // 2. Pass data to the Client Component
-  // If no data exists (new account), 'inventory' will be empty array []
   return (
     <AppLayout>
-       {/* We split this into a separate client component to handle the interactivity */}
-      <InventoryClient initialInventory={inventory || []} />
+      <InventoryClient 
+        initialInventory={inventory || []} 
+        businessTags={business?.inventory_tags || []} // <--- Passing the tags here
+      />
     </AppLayout>
   )
 }

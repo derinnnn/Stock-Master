@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '../utils/supabase/server'
+import { redirect } from 'next/navigation'
 
 // --- TYPES ---
 
@@ -11,6 +12,7 @@ export type SignupFormData = {
   email: string
   password: string
   confirmPassword?: string
+  tags: string[] // <--- NEW: Array of custom tags
 }
 
 export type SigninFormData = {
@@ -34,7 +36,7 @@ export async function signupBusiness(data: SignupFormData) {
     password: data.password,
     options: {
       data: {
-        full_name: data.ownerName, // We save the Owner Name in the user metadata
+        full_name: data.ownerName,
       },
     },
   })
@@ -44,48 +46,43 @@ export async function signupBusiness(data: SignupFormData) {
     return { success: false, error: authError.message }
   }
 
-  // 3. Create the Business Profile in your Database Table
+  // 3. Create the Business Profile with Tags
   if (authData.user) {
     const { error: dbError } = await supabase
       .from('businesses')
       .insert({
-        id: authData.user.id, // Links this business to the login user
+        id: authData.user.id,
         business_name: data.businessName,
-        phone_number: data.phoneNumber
+        phone_number: data.phoneNumber,
+        inventory_tags: data.tags // <--- NEW: Saving the tags to DB
       })
 
     if (dbError) {
       console.error('DB Error:', dbError.message)
+      // Note: User is created in Auth, but DB profile failed. 
+      // In a production app, you might want to delete the Auth user here to "rollback".
       return { success: false, error: 'Account created, but business profile failed.' }
     }
   }
 
-  // 4. Return success so the frontend can redirect
   return { success: true }
 }
 
 export async function signinBusiness(data: SigninFormData) {
   const supabase = await createClient()
 
-  // 1. Attempt to sign in with email and password
   const { error } = await supabase.auth.signInWithPassword({
     email: data.email,
     password: data.password,
   })
 
-  // 2. Handle errors
   if (error) {
     console.error('Login Error:', error.message)
     return { success: false, error: error.message }
   }
 
-  // 3. Success (Next.js handles the session cookies automatically)
   return { success: true }
 }
-
-// app/actions/auth.ts
-
-import { redirect } from 'next/navigation'
 
 export async function signout() {
   const supabase = await createClient()

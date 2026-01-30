@@ -53,3 +53,37 @@ export async function updateProductPrice(id: string, newPrice: number) {
   revalidatePath('/inventory')
   return { success: true }
 }
+
+// ... (keep existing addProduct function)
+
+// 3. FULL PRODUCT UPDATE (Restock, Edit Name, Prices, etc.)
+export async function updateProduct(id: string, formData: FormData) {
+  const supabase = await createClient()
+  
+  const name = formData.get('name') as string
+  const category = formData.get('category') as string
+  // If user adds stock (e.g. +10), you might want a specific 'restock' logic, 
+  // but for now this 'edit' overrides the value to whatever they type.
+  const stock = Number(formData.get('stock')) 
+  const price = Number(formData.get('price'))
+  const cost = Number(formData.get('cost'))
+  const minStock = Number(formData.get('minStock')) || 5
+
+  const { error } = await supabase
+    .from('inventory')
+    .update({
+      name,
+      category,
+      stock,
+      price: price,
+      cost_price: cost,
+      min_stock: minStock
+    })
+    .eq('id', id)
+
+  if (error) return { success: false, error: error.message }
+  
+  revalidatePath('/inventory')
+  revalidatePath('/sales-entry')
+  return { success: true }
+}

@@ -1,14 +1,14 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import Link from "next/link"
-import { Store } from "lucide-react"
+import { Store, Plus, X } from "lucide-react"
 import { signupBusiness, type SignupFormData } from "@/app/actions/auth"
 
 export default function RegisterNewBusiness() {
-  const [formData, setFormData] = useState<SignupFormData>({
+  // Form State for Text Inputs
+  const [formData, setFormData] = useState<Omit<SignupFormData, 'tags'>>({
     businessName: "",
     ownerName: "",
     phoneNumber: "",
@@ -16,10 +16,36 @@ export default function RegisterNewBusiness() {
     password: "",
     confirmPassword: "",
   })
+
+  // Separate State for Tags logic
+  const [tags, setTags] = useState<string[]>([])
+  const [tagInput, setTagInput] = useState("")
+
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [success, setSuccess] = useState(false)
 
+  // Tag Handlers
+  const handleAddTag = () => {
+    const cleanTag = tagInput.trim()
+    if (cleanTag && tags.length < 5 && !tags.includes(cleanTag)) {
+      setTags([...tags, cleanTag])
+      setTagInput("")
+    }
+  }
+
+  const handleRemoveTag = (tagToRemove: string) => {
+    setTags(tags.filter(t => t !== tagToRemove))
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault() // Prevent form submit
+      handleAddTag()
+    }
+  }
+
+  // Submit Handler
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
@@ -27,11 +53,16 @@ export default function RegisterNewBusiness() {
     setIsLoading(true)
 
     try {
-      const response = await signupBusiness(formData)
+      // Combine text data with the tags array
+      const fullData: SignupFormData = {
+        ...formData,
+        tags: tags
+      }
+
+      const response = await signupBusiness(fullData)
 
       if (response.success) {
         setSuccess(true)
-        // Reset form
         setFormData({
           businessName: "",
           ownerName: "",
@@ -40,7 +71,9 @@ export default function RegisterNewBusiness() {
           password: "",
           confirmPassword: "",
         })
-        // Show success message briefly, then redirect
+        setTags([]) // Clear tags
+        
+        // Redirect
         setTimeout(() => {
           window.location.href = "/auth/signin?registered=true"
         }, 2000)
@@ -73,113 +106,91 @@ export default function RegisterNewBusiness() {
         </div>
 
         {success && (
-          <div className="mb-4 p-3 bg-green-50 text-green-700 rounded-md text-sm">
-            Business account created successfully! Redirecting to sign in...
+          <div className="mb-4 p-3 bg-green-50 text-green-700 rounded-md text-sm font-medium border border-green-200">
+            Business account created successfully! Redirecting...
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="businessName" className="block text-sm font-medium text-gray-700 mb-1">
-              Business Name
-            </label>
-            <input
-              id="businessName"
-              name="businessName"
-              type="text"
-              value={formData.businessName}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="e.g., John's General Store"
-              required
-            />
+            <label className="block text-sm font-medium text-gray-700 mb-1">Business Name</label>
+            <input name="businessName" value={formData.businessName} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., John's General Store" required />
           </div>
 
           <div>
-            <label htmlFor="ownerName" className="block text-sm font-medium text-gray-700 mb-1">
-              Your Full Name
-            </label>
-            <input
-              id="ownerName"
-              name="ownerName"
-              type="text"
-              value={formData.ownerName}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Your full name"
-              required
-            />
+            <label className="block text-sm font-medium text-gray-700 mb-1">Your Full Name</label>
+            <input name="ownerName" value={formData.ownerName} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Your full name" required />
           </div>
 
           <div>
-            <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700 mb-1">
-              Phone Number <span className="text-gray-500 text-xs">(optional)</span>
-            </label>
-            <input
-              id="phoneNumber"
-              name="phoneNumber"
-              type="tel"
-              value={formData.phoneNumber}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="e.g., 08012345678"
-            />
+            <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number <span className="text-gray-500 text-xs">(optional)</span></label>
+            <input name="phoneNumber" type="tel" value={formData.phoneNumber} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., 08012345678" />
           </div>
 
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-              Email Address
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              value={formData.email}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="your@email.com"
-              required
-            />
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+            <input name="email" type="email" value={formData.email} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="your@email.com" required />
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-              Password
-            </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              value={formData.password}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Create a password (min 6 characters)"
-              required
-            />
+            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+            <input name="password" type="password" value={formData.password} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Min 6 characters" required />
           </div>
 
           <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
-              Confirm Password
-            </label>
-            <input
-              id="confirmPassword"
-              name="confirmPassword"
-              type="password"
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Confirm your password"
-              required
-            />
+            <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
+            <input name="confirmPassword" type="password" value={formData.confirmPassword} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Confirm your password" required />
           </div>
 
-          {error && <div className="text-red-600 text-sm bg-red-50 p-3 rounded-md">{error}</div>}
+          {/* --- NEW: TOP 5 TAGS SELECTOR --- */}
+          <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+            <div className="flex justify-between items-center mb-2">
+                <label className="text-xs font-bold text-blue-800 uppercase">Top 5 Categories</label>
+                <span className={`text-xs font-bold ${tags.length >= 5 ? 'text-red-500' : 'text-blue-600'}`}>{tags.length}/5</span>
+            </div>
+            <p className="text-[10px] text-blue-600 mb-2">Add categories you sell often (e.g. Wigs, Cement, Rice)</p>
+            
+            <div className="flex gap-2 mb-3">
+                <input 
+                    type="text"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    disabled={tags.length >= 5}
+                    placeholder={tags.length >= 5 ? "Limit reached" : "Type and press Enter..."} 
+                    className="flex-1 px-3 py-2 border border-blue-200 rounded-md text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100" 
+                />
+                <button 
+                    type="button" 
+                    onClick={handleAddTag}
+                    disabled={tags.length >= 5 || !tagInput.trim()}
+                    className="bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                    <Plus className="h-5 w-5" />
+                </button>
+            </div>
+
+            {tags.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                    {tags.map((tag, i) => (
+                        <span key={i} className="bg-white border border-blue-200 text-blue-800 text-xs px-2 py-1 rounded-md flex items-center gap-1 shadow-sm">
+                            {tag}
+                            <button type="button" onClick={() => handleRemoveTag(tag)} className="hover:bg-red-50 hover:text-red-500 rounded-full p-0.5 transition-colors">
+                                <X className="h-3 w-3" />
+                            </button>
+                        </span>
+                    ))}
+                </div>
+            )}
+          </div>
+          {/* -------------------------------- */}
+
+          {error && <div className="text-red-600 text-sm bg-red-50 p-3 rounded-md border border-red-100">{error}</div>}
 
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
+            className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-colors font-semibold shadow-sm"
           >
             {isLoading ? "Creating Account..." : "Register Business"}
           </button>
@@ -188,7 +199,7 @@ export default function RegisterNewBusiness() {
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-600">
             Already have an account?{" "}
-            <Link href="/auth/signin" className="text-blue-600 hover:text-blue-500 font-medium">
+            <Link href="/auth/signin" className="text-blue-600 hover:text-blue-500 font-medium hover:underline">
               Sign in
             </Link>
           </p>
