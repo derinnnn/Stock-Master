@@ -4,7 +4,7 @@ import { createClient } from './../utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 
 // FIX 1: Renamed from 'addExpense' to 'recordExpense' to match your dashboard button
-export async function recordExpense(formData: FormData) {
+export async function addExpense(formData: FormData) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   
