@@ -50,10 +50,42 @@ export default function ReportsClient({ data }: { data: ReportData }) {
   const busiestMonth = data.salesByMonth.reduce((prev, current) => (prev.total > current.total) ? prev : current, { month: '-', total: 0 })
 
   // Transform Data for Recharts
-  const chartData = data.salesByMonth.map(d => ({
-    name: d.month,
-    revenue: d.total
-  }))
+  const chartData = (() => {
+    const activeRange = 6; // Show last 6 months
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+
+    const buckets: Record<string, { name: string, revenue: number }> = {};
+    const orderedData: { name: string, revenue: number }[] = [];
+
+    // 1. Create empty buckets (forces Zeros for months with no sales)
+    for (let i = activeRange - 1; i >= 0; i--) {
+      const d = new Date(currentYear, currentMonth - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      
+      const label = d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }); // e.g., "Aug 2025"
+      
+      const bucket = { name: label, revenue: 0 };
+      buckets[key] = bucket;
+      orderedData.push(bucket);
+    }
+
+    // 2. Fill the buckets with your actual raw sales data
+    if (data.rawSales) {
+      data.rawSales.forEach(sale => {
+        const d = new Date(sale.sold_at);
+        if (isNaN(d.getTime())) return;
+        
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        if (buckets[key]) {
+          buckets[key].revenue += Number(sale.total_amount) || 0;
+        }
+      });
+    }
+
+    return orderedData;
+  })();
 
   // --- EXPORT FUNCTION ---
   const handleExport = () => {
@@ -164,7 +196,7 @@ export default function ReportsClient({ data }: { data: ReportData }) {
           </h3>
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+              <AreaChart data={chartData} margin={{ top: 10, right: 0, left: 20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
@@ -173,7 +205,16 @@ export default function ReportsClient({ data }: { data: ReportData }) {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="name" tick={{fontSize: 12}} tickLine={false} axisLine={false} />
-                <YAxis tick={{fontSize: 12}} tickLine={false} axisLine={false} />
+                <YAxis 
+                tick={{fontSize: 12}} 
+                tickLine={false} 
+                axisLine={false}
+                width={45} /* Gives the axis room to breathe */
+                tickFormatter={(value) => {
+                // Formats 1,500,000 to "1.5M" and 50,000 to "50K"
+                return Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
+                }}
+                />
                 <Tooltip 
                     contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                     formatter={(value: number) => [`₦${value.toLocaleString()}`, 'Revenue']}
